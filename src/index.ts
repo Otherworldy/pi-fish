@@ -189,6 +189,7 @@ export default function piRead(pi: ExtensionAPI) {
     chat: null,
     holdTimer: null,
     turnPage: () => {},
+    hideHold: () => {},
   };
   loadBook(host);
 
@@ -246,6 +247,7 @@ export default function piRead(pi: ExtensionAPI) {
     host.expanded = false;
     refreshBook(host);
   }
+  host.hideHold = hideHold;
 
   function setDir(dir: string) {
     host.saved.dir = dir;

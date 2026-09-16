@@ -17,6 +17,7 @@ export type BlockHost = {
   theme: BlockTheme | null;
   tui: { requestRender: (force?: boolean) => void } | null;
   turnPage: (delta: number) => void;
+  hideHold: () => void;
 };
 
 function paint(theme: BlockTheme | null, color: string, text: string): string {
@@ -58,6 +59,10 @@ export class ThoughtBlock implements Component {
   handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
     if (event.type === "wheel" && this.host.expanded && this.host.absFile) {
       this.host.turnPage((event.wheelDelta ?? 0) < 0 ? -1 : 1);
+      return { handled: true };
+    }
+    if (event.type === "click" && this.host.expanded && event.button !== "right" && event.button !== "middle") {
+      this.host.hideHold();
       return { handled: true };
     }
     return undefined;
