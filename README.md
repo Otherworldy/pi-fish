@@ -18,4 +18,4 @@
 - **Lines per page** — 回车循环 4/8/12/16/20/24
 - **Enabled** — 开/关
 
-翻页仍是 `alt+n` / `alt+p`。
+翻页：按住展开时滚轮，或 `/read n` / `/read p`。

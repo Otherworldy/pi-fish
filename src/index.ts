@@ -224,11 +224,6 @@ export default function piRead(pi: ExtensionAPI) {
         applyLines(cycleLines(host.saved.linesPerPage, matchesKey(data, "alt+]") ? 1 : -1));
         return { consume: true };
       }
-      const next = matchesKey(data, "alt+n") || matchesKey(data, "alt+.");
-      const prev = matchesKey(data, "alt+p") || matchesKey(data, "alt+,");
-      if (!next && !prev) return;
-      turnPage(next ? 1 : -1);
-      return { consume: true };
     });
   }
 
@@ -354,15 +349,6 @@ export default function piRead(pi: ExtensionAPI) {
   pi.on("session_compact", () => {
     host.chat = null;
     refreshBook(host);
-  });
-
-  pi.registerShortcut("alt+n", {
-    description: "Next txt page",
-    handler: async () => turnPage(1),
-  });
-  pi.registerShortcut("alt+p", {
-    description: "Previous txt page",
-    handler: async () => turnPage(-1),
   });
 
   pi.registerCommand("read", {
