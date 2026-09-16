@@ -56,6 +56,13 @@ export function showReadPanel(
       const sync = { run() {} };
       const items: SettingItem[] = [
         {
+          id: "enabled",
+          label: "Enabled",
+          description: "Show the thought-style block under the latest message",
+          currentValue: state.enabled ? "on" : "off",
+          values: ["on", "off"],
+        },
+        {
           id: "path",
           label: "Path",
           description: "Address bar — folder or .txt; File follows",
@@ -101,13 +108,6 @@ export function showReadPanel(
           description: "How many lines to show while holding",
           currentValue: String(state.linesPerPage),
           values: LINE_CHOICES.map(String),
-        },
-        {
-          id: "enabled",
-          label: "Enabled",
-          description: "Show the thought-style block under the latest message",
-          currentValue: state.enabled ? "on" : "off",
-          values: ["on", "off"],
         },
       ];
       const list = new SettingsList(

@@ -70,7 +70,7 @@ export function holdKeyFromData(data: string): string | undefined {
 
 export function cycleLines(current: number, delta: number): number {
   const i = LINE_CHOICES.indexOf(current as (typeof LINE_CHOICES)[number]);
-  const idx = Math.max(0, Math.min(LINE_CHOICES.length - 1, (i < 0 ? 3 : i) + delta));
+  const idx = Math.max(0, Math.min(LINE_CHOICES.length - 1, (i < 0 ? 0 : i) + delta));
   return LINE_CHOICES[idx]!;
 }
 
@@ -131,7 +131,7 @@ export function wrapLine(line: string, width: number): string[] {
   return out.length ? out : [""];
 }
 
-export function paginate(text: string, width = PAGE_WIDTH, linesPerPage = 16): string[] {
+export function paginate(text: string, width = PAGE_WIDTH, linesPerPage = 4): string[] {
   const lines: string[] = [];
   const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   for (const line of normalized.split("\n")) lines.push(...wrapLine(line, width));

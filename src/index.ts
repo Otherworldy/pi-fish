@@ -47,7 +47,7 @@ function configPath(): string {
 }
 
 function defaultSaved(): Saved {
-  return { dir: "", file: null, page: 0, linesPerPage: 16, holdKey: DEFAULT_HOLD_KEY, enabled: true, progress: {} };
+  return { dir: "", file: null, page: 0, linesPerPage: 4, holdKey: DEFAULT_HOLD_KEY, enabled: true, progress: {} };
 }
 
 function loadSaved(): Saved {
@@ -62,7 +62,7 @@ function loadSaved(): Saved {
       holdKey: parseHoldKey(raw.holdKey),
       linesPerPage: LINE_CHOICES.includes(raw.linesPerPage as (typeof LINE_CHOICES)[number])
         ? (raw.linesPerPage as (typeof LINE_CHOICES)[number])
-        : 16,
+        : 4,
       progress: raw.progress && typeof raw.progress === "object" ? raw.progress : {},
     };
   } catch {
