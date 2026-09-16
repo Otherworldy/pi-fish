@@ -34,6 +34,7 @@ export type PanelState = {
   linesPerPage: number;
   holdKey: string;
   enabled: boolean;
+  decoy: boolean;
 };
 
 export type PanelHandlers = {
@@ -41,6 +42,7 @@ export type PanelHandlers = {
   setLines(n: number): void;
   setHoldKey(key: string): void;
   setEnabled(on: boolean): void;
+  setDecoy(on: boolean): void;
   openFile(name: string): void;
   applyPath(raw: string): string | null;
 };
@@ -60,6 +62,13 @@ export function showReadPanel(
           label: "Enabled",
           description: "Show the thought-style block under the latest message",
           currentValue: state.enabled ? "on" : "off",
+          values: ["on", "off"],
+        },
+        {
+          id: "decoy",
+          label: "Thought row",
+          description: "Show the fake Thought under the latest message",
+          currentValue: state.decoy ? "on" : "off",
           values: ["on", "off"],
         },
         {
@@ -117,6 +126,7 @@ export function showReadPanel(
         (id, value) => {
           if (id === "lines") handlers.setLines(Number(value));
           if (id === "enabled") handlers.setEnabled(value === "on");
+          if (id === "decoy") handlers.setDecoy(value === "on");
           if (id === "holdKey") handlers.setHoldKey(value);
           if (id === "path" || id === "file") sync.run();
         },

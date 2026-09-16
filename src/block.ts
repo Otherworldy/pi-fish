@@ -7,7 +7,7 @@ export type BlockTheme = {
 };
 
 export type BlockHost = {
-  saved: { enabled: boolean; page: number; linesPerPage: number };
+  saved: { enabled: boolean; decoy: boolean; page: number; linesPerPage: number };
   pages: string[];
   raw: string;
   wrapWidth: number;
@@ -69,6 +69,7 @@ export class ThoughtBlock implements Component {
   }
 
   render(width: number): string[] {
+    if (!this.host.saved.decoy && !this.host.expanded) return [];
     const w = Math.max(8, width);
     relayout(this.host, w);
     const theme = this.host.theme;

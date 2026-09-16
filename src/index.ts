@@ -27,6 +27,7 @@ type Saved = {
   linesPerPage: number;
   holdKey: string;
   enabled: boolean;
+  decoy: boolean;
   progress: Record<string, number>;
 };
 
@@ -48,7 +49,7 @@ function configPath(): string {
 }
 
 function defaultSaved(): Saved {
-  return { dir: "", file: null, page: 0, linesPerPage: 4, holdKey: DEFAULT_HOLD_KEY, enabled: true, progress: {} };
+  return { dir: "", file: null, page: 0, linesPerPage: 4, holdKey: DEFAULT_HOLD_KEY, enabled: true, decoy: true, progress: {} };
 }
 
 function loadSaved(): Saved {
@@ -61,6 +62,7 @@ function loadSaved(): Saved {
       ...raw,
       dir: typeof raw.dir === "string" && raw.dir ? resolve(raw.dir) : "",
       holdKey: parseHoldKey(raw.holdKey),
+      decoy: raw.decoy !== false,
       linesPerPage: LINE_CHOICES.includes(raw.linesPerPage as (typeof LINE_CHOICES)[number])
         ? (raw.linesPerPage as (typeof LINE_CHOICES)[number])
         : 4,
@@ -398,6 +400,9 @@ export default function piRead(pi: ExtensionAPI) {
           get enabled() {
             return host.saved.enabled;
           },
+          get decoy() {
+            return host.saved.decoy;
+          },
         },
         {
           setDir,
@@ -413,6 +418,11 @@ export default function piRead(pi: ExtensionAPI) {
             if (!on) host.expanded = false;
             saveSaved(host.saved);
             bindTui(ctx);
+            refreshBook(host);
+          },
+          setDecoy(on) {
+            host.saved.decoy = on;
+            saveSaved(host.saved);
             refreshBook(host);
           },
           openFile(name) {
