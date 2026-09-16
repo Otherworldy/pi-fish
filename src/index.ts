@@ -10,6 +10,7 @@ import {
   isHoldSequence,
   lastThinkingText,
   loadText,
+  pageForLine,
   paginate,
   parseHoldKey,
   parseUserPath,
@@ -310,6 +311,15 @@ export default function piRead(pi: ExtensionAPI) {
 
   host.turnPage = turnPage;
 
+  function jumpToLine(line1: number) {
+    if (!host.absFile || !host.raw) return;
+    const width = host.wrapWidth || undefined;
+    host.pages = paginate(host.raw, width, host.saved.linesPerPage);
+    host.saved.page = pageForLine(host.raw, line1, width, host.saved.linesPerPage);
+    persistPage(host);
+    refreshBook(host);
+  }
+
   pi.on("session_start", (_e, ctx) => {
     host.session = ctx;
     host.expanded = false;
@@ -355,47 +365,13 @@ export default function piRead(pi: ExtensionAPI) {
 
   pi.registerCommand("read", {
     description: "Local txt in a thinking-style block",
-    getArgumentCompletions: (prefix: string) => {
-      const items = [
-        { value: "n", label: "n", description: "next page" },
-        { value: "p", label: "p", description: "previous page" },
-        { value: "on", label: "on", description: "enable" },
-        { value: "off", label: "off", description: "disable" },
-        ...LINE_CHOICES.map((n) => ({ value: String(n), label: String(n), description: "lines per page" })),
-      ];
-      return items.filter((i) => i.value.startsWith(prefix));
-    },
     handler: async (args, ctx) => {
-      const cmd = args.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
-      host.session = ctx;
-      if (cmd === "n") {
-        turnPage(1);
-        return;
-      }
-      if (cmd === "p") {
-        turnPage(-1);
-        return;
-      }
-      if (LINE_CHOICES.includes(Number(cmd) as (typeof LINE_CHOICES)[number])) {
-        applyLines(Number(cmd));
-        return;
-      }
-      if (cmd === "on") {
-        host.saved.enabled = true;
-        saveSaved(host.saved);
-        bindTui(ctx);
-        refreshBook(host);
-        return;
-      }
-      if (cmd === "off") {
-        host.saved.enabled = false;
-        host.expanded = false;
-        saveSaved(host.saved);
-        bindTui(ctx);
-        refreshBook(host);
-        return;
-      }
       const rest = args.trim();
+      host.session = ctx;
+      if (/^\d+$/.test(rest)) {
+        jumpToLine(Number(rest));
+        return;
+      }
       if (rest && parseUserPath(rest)) {
         applyPath(rest);
         bindTui(ctx);

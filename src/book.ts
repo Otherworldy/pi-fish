@@ -131,15 +131,29 @@ export function wrapLine(line: string, width: number): string[] {
   return out.length ? out : [""];
 }
 
+function fileLines(text: string): string[] {
+  return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+}
+
 export function paginate(text: string, width = PAGE_WIDTH, linesPerPage = 4): string[] {
   const lines: string[] = [];
-  const normalized = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  for (const line of normalized.split("\n")) lines.push(...wrapLine(line, width));
+  for (const line of fileLines(text)) lines.push(...wrapLine(line, width));
   if (lines.length === 0) return [""];
   const n = Math.max(1, linesPerPage);
   const pages: string[] = [];
   for (let i = 0; i < lines.length; i += n) pages.push(lines.slice(i, i + n).join("\n"));
   return pages;
+}
+
+/** 1-based txt line → page index after wrap. */
+export function pageForLine(text: string, line1: number, width = PAGE_WIDTH, linesPerPage = 4): number {
+  const rows = fileLines(text);
+  if (!rows.length) return 0;
+  const target = Math.max(0, Math.min(rows.length - 1, Math.floor(line1) - 1));
+  let wrapped = 0;
+  for (let i = 0; i < target; i++) wrapped += wrapLine(rows[i]!, width).length;
+  const n = Math.max(1, linesPerPage);
+  return Math.floor(wrapped / n);
 }
 
 export function decodeBytes(buf: Buffer): string {

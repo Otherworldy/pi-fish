@@ -17,6 +17,7 @@ import {
   loadText,
   parentDir,
   pageAt,
+  pageForLine,
   paginate,
   parseHoldKey,
   parseUserPath,
@@ -35,6 +36,15 @@ test("paginate splits wrapped lines", () => {
   assert.equal(pages.length, 2);
   assert.equal(pages[0], "aaaa\nbbbb");
   assert.equal(pages[1], "cccc");
+});
+
+test("pageForLine is 1-based file line", () => {
+  const text = "aaaa\nbbbb\ncccc";
+  assert.equal(pageForLine(text, 1, 4, 2), 0);
+  assert.equal(pageForLine(text, 2, 4, 2), 0);
+  assert.equal(pageForLine(text, 3, 4, 2), 1);
+  assert.equal(pageForLine(text, 99, 4, 2), 1);
+  assert.equal(pageForLine(text, 0, 4, 2), 0);
 });
 
 test("pageAt clamps", () => {
