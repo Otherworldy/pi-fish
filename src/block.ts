@@ -1,9 +1,9 @@
-import { Text, truncateToWidth, visibleWidth, type Component, type TuiMouseEvent, type TuiMouseEventResult } from "@earendil-works/pi-tui";
+import { truncateToWidth, visibleWidth, type Component, type TuiMouseEvent, type TuiMouseEventResult } from "@earendil-works/pi-tui";
 import { pageAt, paginate, thoughtContent, thoughtTitle } from "./book.ts";
 
 export type BlockTheme = {
-  fg?(color: string, text: string): string;
-  italic?(text: string): string;
+  fg(color: string, text: string): string;
+  italic(text: string): string;
 };
 
 export type BlockHost = {
@@ -20,12 +20,11 @@ export type BlockHost = {
 };
 
 function paint(theme: BlockTheme | null, color: string, text: string): string {
-  return theme?.fg ? theme.fg(color, text) : text;
+  return theme ? theme.fg(color, text) : text;
 }
 
 function thinkingStyle(theme: BlockTheme | null, text: string): string {
-  const colored = paint(theme, "thinkingText", text);
-  return theme?.italic ? theme.italic(colored) : colored;
+  return theme ? theme.italic(theme.fg("thinkingText", text)) : text;
 }
 
 function padPreviewLine(line: string, width: number, padding: number): string {
@@ -69,6 +68,7 @@ export class ThoughtBlock implements Component {
     relayout(this.host, w);
     const theme = this.host.theme;
     const pad = 1;
+    const inner = Math.max(1, w - pad * 2);
     const page = this.host.absFile ? pageAt(this.host.pages, this.host.saved.page) : this.host.preview;
     const content = thoughtContent({
       expanded: this.host.expanded,
@@ -77,12 +77,15 @@ export class ThoughtBlock implements Component {
       width: w,
       title: thoughtTitle(this.host.absFile),
     });
-    const headingText = thinkingStyle(theme, content.title) + (content.hint ? paint(theme, "dim", content.hint) : "");
-    const heading = new Text(headingText, pad, 0).render(w);
-    if (!content.body.length) return ["", ...heading];
-    const body = content.body.map((line) =>
-      padPreviewLine(thinkingStyle(theme, truncateToWidth(line, Math.max(1, w - pad * 2))), w, pad),
+    const heading = padPreviewLine(
+      thinkingStyle(theme, content.title) + (content.hint ? paint(theme, "dim", content.hint) : ""),
+      w,
+      pad,
     );
-    return ["", ...heading, ...body];
+    if (!content.body.length) return ["", heading];
+    const body = content.body.map((line) =>
+      padPreviewLine(thinkingStyle(theme, truncateToWidth(line, inner)), w, pad),
+    );
+    return ["", heading, ...body];
   }
 }
