@@ -1,0 +1,19 @@
+{
+  "name": "pi-fish",
+  "version": "0.1.0",
+  "description": "Show a local txt page in a thinking-style block above the editor.",
+  "type": "module",
+  "files": ["src/**/*.ts", "README.md"],
+  "keywords": ["pi-package", "pi", "pi-coding-agent", "extension"],
+  "license": "MIT",
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": ">=0.84.0",
+    "@earendil-works/pi-tui": ">=0.84.0"
+  },
+  "pi": {
+    "extensions": ["./src/index.ts"]
+  }
+}
