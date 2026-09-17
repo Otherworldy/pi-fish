@@ -1,5 +1,5 @@
 import { truncateToWidth, visibleWidth, type Component, type TuiMouseEvent, type TuiMouseEventResult } from "@earendil-works/pi-tui";
-import { pageAt, paginate, thoughtContent, thoughtTitle } from "./book.ts";
+import { buildWrapIndex, pageFromLine, pageText, thoughtContent, thoughtTitle, type WrapIndex } from "./book.ts";
 
 export type BlockTheme = {
   fg(color: string, text: string): string;
@@ -7,8 +7,8 @@ export type BlockTheme = {
 };
 
 export type BlockHost = {
-  saved: { enabled: boolean; decoy: boolean; page: number; linesPerPage: number };
-  pages: string[];
+  saved: { enabled: boolean; decoy: boolean; page: number; line: number; linesPerPage: number };
+  wrapIndex: WrapIndex | null;
   raw: string;
   wrapWidth: number;
   absFile: string | null;
@@ -37,14 +37,13 @@ function padPreviewLine(line: string, width: number, padding: number): string {
 
 function relayout(host: BlockHost, width: number): void {
   const inner = Math.max(1, width - 2);
-  if (host.wrapWidth === inner) return;
   host.wrapWidth = inner;
   if (!host.raw) {
-    host.pages = [];
+    host.wrapIndex = null;
     return;
   }
-  host.pages = paginate(host.raw, inner, host.saved.linesPerPage);
-  host.saved.page = Math.max(0, Math.min(host.saved.page, Math.max(0, host.pages.length - 1)));
+  if (!host.wrapIndex || host.wrapIndex.width !== inner) host.wrapIndex = buildWrapIndex(host.raw, inner);
+  host.saved.page = pageFromLine(host.wrapIndex, host.saved.line, host.saved.linesPerPage);
 }
 
 export class ThoughtBlock implements Component {
@@ -75,7 +74,10 @@ export class ThoughtBlock implements Component {
     const theme = this.host.theme;
     const pad = 1;
     const inner = Math.max(1, w - pad * 2);
-    const page = this.host.absFile ? pageAt(this.host.pages, this.host.saved.page) : this.host.preview;
+    const page =
+      this.host.absFile && this.host.wrapIndex
+        ? pageText(this.host.wrapIndex, this.host.saved.page, this.host.saved.linesPerPage)
+        : this.host.preview;
     const content = thoughtContent({
       expanded: this.host.expanded,
       preview: this.host.preview,

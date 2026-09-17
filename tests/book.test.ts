@@ -8,16 +8,24 @@ import {
   decodeBytes,
   FALLBACK_THINKING,
   cycleLines,
+  findLine,
   holdKeyFromData,
   isHoldSequence,
   lastThinkingText,
+  lastPage,
+  lineFromPage,
+  isExistingFilePath,
   joinDir,
   listDir,
   listDrives,
   loadText,
   parentDir,
+  lineAtPage,
+  buildWrapIndex,
   pageAt,
   pageForLine,
+  pageFromLine,
+  pageText,
   paginate,
   parseHoldKey,
   parseUserPath,
@@ -38,6 +46,15 @@ test("paginate splits wrapped lines", () => {
   assert.equal(pages[1], "cccc");
 });
 
+test("findLine next hit wraps", () => {
+  const text = "aaa\nbbb foo\nccc\nfoo ddd";
+  assert.equal(findLine(text, "foo", 1), 2);
+  assert.equal(findLine(text, "foo", 3), 4);
+  assert.equal(findLine(text, "foo", 5), 2);
+  assert.equal(findLine(text, "zzz", 1), 0);
+  assert.equal(findLine(text, "", 1), 0);
+});
+
 test("pageForLine is 1-based file line", () => {
   const text = "aaaa\nbbbb\ncccc";
   assert.equal(pageForLine(text, 1, 4, 2), 0);
@@ -45,6 +62,20 @@ test("pageForLine is 1-based file line", () => {
   assert.equal(pageForLine(text, 3, 4, 2), 1);
   assert.equal(pageForLine(text, 99, 4, 2), 1);
   assert.equal(pageForLine(text, 0, 4, 2), 0);
+  assert.equal(lineAtPage(text, 0, 4, 2), 1);
+  assert.equal(lineAtPage(text, 1, 4, 2), 3);
+  assert.equal(pageForLine(text, lineAtPage(text, 1, 4, 2), 4, 2), 1);
+});
+
+test("wrap index matches paginate", () => {
+  const text = "aaaa\nbbbb\ncccc";
+  const idx = buildWrapIndex(text, 4);
+  const pages = paginate(text, 4, 2);
+  assert.equal(lastPage(idx, 2), pages.length - 1);
+  assert.equal(pageText(idx, 0, 2), pages[0]);
+  assert.equal(pageText(idx, 1, 2), pages[1]);
+  assert.equal(pageFromLine(idx, 3, 2), 1);
+  assert.equal(lineFromPage(idx, 1, 2), 3);
 });
 
 test("pageAt clamps", () => {
@@ -105,6 +136,10 @@ test("parseUserPath file dir quotes tilde", () => {
   assert.deepEqual(parseUserPath(dir), { dir: resolve(dir), file: null });
   assert.equal(parseUserPath("   "), null);
   assert.equal(parseUserPath("~")?.dir, resolve(homedir()));
+  assert.equal(isExistingFilePath(file), true);
+  assert.equal(isExistingFilePath(join(dir, "missing.txt")), false);
+  assert.equal(isExistingFilePath(dir), false);
+  assert.equal(isExistingFilePath("方舟~"), false);
 });
 
 test("listDrives only on windows", () => {

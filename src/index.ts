@@ -9,9 +9,14 @@ import {
   cycleLines,
   isHoldSequence,
   lastThinkingText,
+  PAGE_WIDTH,
+  buildWrapIndex,
+  findLine,
+  isExistingFilePath,
+  lastPage,
+  lineFromPage,
   loadText,
-  pageForLine,
-  paginate,
+  pageFromLine,
   parseHoldKey,
   parseUserPath,
 } from "./book.ts";
@@ -24,6 +29,7 @@ type Saved = {
   dir: string;
   file: string | null;
   page: number;
+  line: number;
   linesPerPage: number;
   holdKey: string;
   enabled: boolean;
@@ -38,6 +44,7 @@ type Host = BlockHost & {
   block: ThoughtBlock | null;
   chat: { children: any[]; addChild(c: any): void; removeChild(c: any): void } | null;
   holdTimer: ReturnType<typeof setTimeout> | null;
+  lastKeyword: string;
 };
 
 function agentDir(): string {
@@ -49,7 +56,7 @@ function configPath(): string {
 }
 
 function defaultSaved(): Saved {
-  return { dir: "", file: null, page: 0, linesPerPage: 4, holdKey: DEFAULT_HOLD_KEY, enabled: true, decoy: true, progress: {} };
+  return { dir: "", file: null, page: 0, line: 1, linesPerPage: 4, holdKey: DEFAULT_HOLD_KEY, enabled: true, decoy: true, progress: {} };
 }
 
 function loadSaved(): Saved {
@@ -63,6 +70,7 @@ function loadSaved(): Saved {
       dir: typeof raw.dir === "string" && raw.dir ? resolve(raw.dir) : "",
       holdKey: parseHoldKey(raw.holdKey),
       decoy: raw.decoy !== false,
+      line: typeof raw.line === "number" && raw.line >= 1 ? Math.floor(raw.line) : 1,
       linesPerPage: LINE_CHOICES.includes(raw.linesPerPage as (typeof LINE_CHOICES)[number])
         ? (raw.linesPerPage as (typeof LINE_CHOICES)[number])
         : 4,
@@ -88,23 +96,23 @@ function branchEntries(ctx: ExtensionContext | null): any[] {
 }
 
 function loadBook(host: Host): void {
-  host.pages = [];
+  host.wrapIndex = null;
   host.raw = "";
   host.wrapWidth = 0;
   host.absFile = null;
+  host.lastKeyword = "";
   if (!host.saved.dir || !host.saved.file) return;
   const abs = isAbsolute(host.saved.file) ? host.saved.file : join(host.saved.dir, host.saved.file);
   if (!existsSync(abs)) return;
   host.absFile = abs;
   host.raw = loadText(abs);
-  host.pages = paginate(host.raw, undefined, host.saved.linesPerPage);
   const remembered = host.saved.progress[abs];
-  if (typeof remembered === "number") host.saved.page = remembered;
-  host.saved.page = Math.max(0, Math.min(host.saved.page, Math.max(0, host.pages.length - 1)));
+  if (typeof remembered === "number" && remembered >= 1) host.saved.line = Math.floor(remembered);
+  if (!(host.saved.line >= 1)) host.saved.line = 1;
 }
 
 function persistPage(host: Host): void {
-  if (host.absFile) host.saved.progress[host.absFile] = host.saved.page;
+  if (host.absFile) host.saved.progress[host.absFile] = host.saved.line;
   saveSaved(host.saved);
 }
 
@@ -178,7 +186,7 @@ function mountInChat(host: Host): void {
 export default function piRead(pi: ExtensionAPI) {
   const host: Host = {
     saved: loadSaved(),
-    pages: [],
+    wrapIndex: null,
     raw: "",
     wrapWidth: 0,
     absFile: null,
@@ -191,6 +199,7 @@ export default function piRead(pi: ExtensionAPI) {
     block: null,
     chat: null,
     holdTimer: null,
+    lastKeyword: "",
     turnPage: () => {},
     hideHold: () => {},
   };
@@ -258,7 +267,7 @@ export default function piRead(pi: ExtensionAPI) {
       host.saved.file = null;
       host.absFile = null;
       host.raw = "";
-      host.pages = [];
+      host.wrapIndex = null;
       refreshBook(host);
     }
     saveSaved(host.saved);
@@ -271,7 +280,7 @@ export default function piRead(pi: ExtensionAPI) {
     if (parsed.file) {
       host.saved.file = parsed.file;
       host.saved.enabled = true;
-      host.saved.page = host.saved.progress[join(host.saved.dir, parsed.file)] ?? 0;
+      host.saved.line = host.saved.progress[join(host.saved.dir, parsed.file)] ?? 1;
       loadBook(host);
       persistPage(host);
       host.expanded = false;
@@ -283,7 +292,7 @@ export default function piRead(pi: ExtensionAPI) {
       host.saved.file = null;
       host.absFile = null;
       host.raw = "";
-      host.pages = [];
+      host.wrapIndex = null;
       saveSaved(host.saved);
       refreshBook(host);
     }
@@ -293,19 +302,25 @@ export default function piRead(pi: ExtensionAPI) {
   function applyLines(n: number) {
     if (n === host.saved.linesPerPage) return;
     host.saved.linesPerPage = n;
-    host.wrapWidth = 0;
-    if (host.raw) {
-      host.pages = paginate(host.raw, undefined, n);
-      host.saved.page = Math.max(0, Math.min(host.saved.page, Math.max(0, host.pages.length - 1)));
-    }
+    if (host.wrapIndex) host.saved.page = pageFromLine(host.wrapIndex, host.saved.line, n);
     persistPage(host);
     refreshBook(host);
   }
 
   function turnPage(delta: number) {
-    if (!host.absFile || host.pages.length === 0) return;
-    const next = Math.max(0, Math.min(host.pages.length - 1, host.saved.page + delta));
-    if (next === host.saved.page) return;
+    if (!host.absFile || !host.raw) return;
+    if (!host.wrapIndex) {
+      const w = host.wrapWidth || PAGE_WIDTH;
+      host.wrapIndex = buildWrapIndex(host.raw, w);
+      host.wrapWidth = w;
+    }
+    const idx = host.wrapIndex;
+    const n = host.saved.linesPerPage;
+    const cur = pageFromLine(idx, host.saved.line, n);
+    const last = lastPage(idx, n);
+    const next = Math.max(0, Math.min(last, cur + delta));
+    if (next === cur) return;
+    host.saved.line = lineFromPage(idx, next, n);
     host.saved.page = next;
     persistPage(host);
     refreshBook(host);
@@ -315,11 +330,18 @@ export default function piRead(pi: ExtensionAPI) {
 
   function jumpToLine(line1: number) {
     if (!host.absFile || !host.raw) return;
-    const width = host.wrapWidth || undefined;
-    host.pages = paginate(host.raw, width, host.saved.linesPerPage);
-    host.saved.page = pageForLine(host.raw, line1, width, host.saved.linesPerPage);
+    host.saved.line = Math.max(1, Math.floor(line1));
+    if (host.wrapIndex) host.saved.page = pageFromLine(host.wrapIndex, host.saved.line, host.saved.linesPerPage);
     persistPage(host);
     refreshBook(host);
+  }
+
+  function jumpToKeyword(keyword: string) {
+    if (!host.absFile || !host.raw || !keyword) return;
+    const from = keyword === host.lastKeyword ? host.saved.line + 1 : host.saved.line;
+    host.lastKeyword = keyword;
+    const line = findLine(host.raw, keyword, from);
+    if (line) jumpToLine(line);
   }
 
   pi.on("session_start", (_e, ctx) => {
@@ -372,6 +394,10 @@ export default function piRead(pi: ExtensionAPI) {
       host.session = ctx;
       if (/^\d+$/.test(rest)) {
         jumpToLine(Number(rest));
+        return;
+      }
+      if (rest && host.absFile && !isExistingFilePath(rest)) {
+        jumpToKeyword(rest);
         return;
       }
       if (rest && parseUserPath(rest)) {
@@ -428,7 +454,7 @@ export default function piRead(pi: ExtensionAPI) {
           openFile(name) {
             host.saved.file = name;
             host.saved.enabled = true;
-            host.saved.page = host.saved.progress[join(host.saved.dir, name)] ?? 0;
+            host.saved.line = host.saved.progress[join(host.saved.dir, name)] ?? 1;
             loadBook(host);
             persistPage(host);
             host.expanded = false;

@@ -3,7 +3,6 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 export const PAGE_WIDTH = 72;
-export const MAX_BYTES = 8 * 1024 * 1024;
 export const LINE_CHOICES = [4, 8, 12, 16, 20, 24] as const;
 export const PREVIEW_LINES = 3;
 export const FALLBACK_THINKING = "Considering the request and the next steps.";
@@ -135,6 +134,20 @@ function fileLines(text: string): string[] {
   return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
 }
 
+/** 1-based file line of the next substring hit, wrapping. 0 if none. */
+export function findLine(text: string, keyword: string, fromLine1 = 1): number {
+  if (!keyword) return 0;
+  const rows = fileLines(text);
+  const n = rows.length;
+  if (!n) return 0;
+  const start = ((Math.floor(fromLine1) - 1) % n + n) % n;
+  for (let i = 0; i < n; i++) {
+    const idx = (start + i) % n;
+    if (rows[idx]!.includes(keyword)) return idx + 1;
+  }
+  return 0;
+}
+
 export function paginate(text: string, width = PAGE_WIDTH, linesPerPage = 4): string[] {
   const lines: string[] = [];
   for (const line of fileLines(text)) lines.push(...wrapLine(line, width));
@@ -145,15 +158,76 @@ export function paginate(text: string, width = PAGE_WIDTH, linesPerPage = 4): st
   return pages;
 }
 
+export type WrapIndex = {
+  width: number;
+  rows: string[];
+  starts: Uint32Array;
+};
+
+export function buildWrapIndex(text: string, width: number): WrapIndex {
+  const w = Math.max(1, width);
+  const rows = fileLines(text);
+  const starts = new Uint32Array(rows.length + 1);
+  for (let i = 0; i < rows.length; i++) starts[i + 1] = starts[i]! + wrapLine(rows[i]!, w).length;
+  return { width: w, rows, starts };
+}
+
+export function pageFromLine(index: WrapIndex, line1: number, linesPerPage: number): number {
+  const n = Math.max(1, linesPerPage);
+  if (!index.rows.length) return 0;
+  const i = Math.max(0, Math.min(index.rows.length - 1, Math.floor(line1) - 1));
+  return Math.floor(index.starts[i]! / n);
+}
+
+export function lastPage(index: WrapIndex, linesPerPage: number): number {
+  const n = Math.max(1, linesPerPage);
+  const total = index.starts[index.rows.length] ?? 0;
+  if (total <= 0) return 0;
+  return Math.floor((total - 1) / n);
+}
+
+export function lineFromPage(index: WrapIndex, page: number, linesPerPage: number): number {
+  const n = Math.max(1, linesPerPage);
+  if (!index.rows.length) return 1;
+  const total = index.starts[index.rows.length]!;
+  const target = Math.max(0, page) * n;
+  if (target >= total) return index.rows.length;
+  let lo = 0;
+  let hi = index.rows.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (index.starts[mid]! <= target) lo = mid;
+    else hi = mid - 1;
+  }
+  return lo + 1;
+}
+
+export function pageText(index: WrapIndex, page: number, linesPerPage: number): string {
+  const n = Math.max(1, linesPerPage);
+  const total = index.starts[index.rows.length] ?? 0;
+  const start = Math.max(0, page) * n;
+  if (start >= total) return "";
+  const out: string[] = [];
+  const line0 = lineFromPage(index, page, n) - 1;
+  let wrapped = index.starts[line0]!;
+  for (let i = line0; i < index.rows.length && out.length < n; i++) {
+    for (const part of wrapLine(index.rows[i]!, index.width)) {
+      if (wrapped >= start && out.length < n) out.push(part);
+      wrapped++;
+      if (out.length >= n) break;
+    }
+  }
+  return out.join("\n");
+}
+
 /** 1-based txt line → page index after wrap. */
 export function pageForLine(text: string, line1: number, width = PAGE_WIDTH, linesPerPage = 4): number {
-  const rows = fileLines(text);
-  if (!rows.length) return 0;
-  const target = Math.max(0, Math.min(rows.length - 1, Math.floor(line1) - 1));
-  let wrapped = 0;
-  for (let i = 0; i < target; i++) wrapped += wrapLine(rows[i]!, width).length;
-  const n = Math.max(1, linesPerPage);
-  return Math.floor(wrapped / n);
+  return pageFromLine(buildWrapIndex(text, width), line1, linesPerPage);
+}
+
+/** Page index → 1-based file line at the top of that page. */
+export function lineAtPage(text: string, page: number, width = PAGE_WIDTH, linesPerPage = 4): number {
+  return lineFromPage(buildWrapIndex(text, width), page, linesPerPage);
 }
 
 export function decodeBytes(buf: Buffer): string {
@@ -178,7 +252,7 @@ export function decodeBytes(buf: Buffer): string {
 }
 
 export function loadText(path: string): string {
-  return decodeBytes(readFileSync(path).subarray(0, MAX_BYTES));
+  return decodeBytes(readFileSync(path));
 }
 
 /** C:\\ through Z:\\ that currently exist. Skip A:/B: — floppy/optical existsSync can hang. */
@@ -329,4 +403,14 @@ export function parseUserPath(raw: string): { dir: string; file: string | null }
     return { dir: abs, file: null };
   }
   return { dir: dirname(abs), file: basename(abs) };
+}
+
+export function isExistingFilePath(raw: string): boolean {
+  const parsed = parseUserPath(raw);
+  if (!parsed?.file) return false;
+  try {
+    return statSync(join(parsed.dir, parsed.file)).isFile();
+  } catch {
+    return false;
+  }
 }
