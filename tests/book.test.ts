@@ -14,6 +14,7 @@ import {
   lastThinkingText,
   lastPage,
   lineFromPage,
+  clampPage,
   isExistingFilePath,
   joinDir,
   listDir,
@@ -65,6 +66,24 @@ test("pageForLine is 1-based file line", () => {
   assert.equal(lineAtPage(text, 0, 4, 2), 1);
   assert.equal(lineAtPage(text, 1, 4, 2), 3);
   assert.equal(pageForLine(text, lineAtPage(text, 1, 4, 2), 4, 2), 1);
+});
+
+test("clampPage advances inside a long wrapped line", () => {
+  const idx = buildWrapIndex("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcd", 4);
+  assert.equal(idx.starts[1], 10);
+  assert.equal(pageFromLine(idx, 1, 2), 0);
+  assert.equal(lastPage(idx, 2), 4);
+  let line = 1;
+  let page = 0;
+  for (let i = 0; i < 4; i++) {
+    const next = Math.min(lastPage(idx, 2), page + 1);
+    line = lineFromPage(idx, next, 2);
+    page = clampPage(idx, line, next, 2);
+  }
+  assert.equal(line, 1);
+  assert.equal(page, 4);
+  assert.equal(pageText(idx, 0, 2), "ABCD\nEFGH");
+  assert.equal(pageText(idx, 4, 2), "6789\nabcd");
 });
 
 test("wrap index matches paginate", () => {

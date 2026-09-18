@@ -316,8 +316,8 @@ export default function piRead(pi: ExtensionAPI) {
     }
     const idx = host.wrapIndex;
     const n = host.saved.linesPerPage;
-    const cur = pageFromLine(idx, host.saved.line, n);
     const last = lastPage(idx, n);
+    const cur = Math.max(0, Math.min(last, host.saved.page));
     const next = Math.max(0, Math.min(last, cur + delta));
     if (next === cur) return;
     host.saved.line = lineFromPage(idx, next, n);

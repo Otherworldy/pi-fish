@@ -1,5 +1,5 @@
 import { truncateToWidth, visibleWidth, type Component, type TuiMouseEvent, type TuiMouseEventResult } from "@earendil-works/pi-tui";
-import { buildWrapIndex, pageFromLine, pageText, thoughtContent, thoughtTitle, type WrapIndex } from "./book.ts";
+import { buildWrapIndex, clampPage, pageFromLine, pageText, thoughtContent, thoughtTitle, type WrapIndex } from "./book.ts";
 
 export type BlockTheme = {
   fg(color: string, text: string): string;
@@ -42,8 +42,12 @@ function relayout(host: BlockHost, width: number): void {
     host.wrapIndex = null;
     return;
   }
-  if (!host.wrapIndex || host.wrapIndex.width !== inner) host.wrapIndex = buildWrapIndex(host.raw, inner);
-  host.saved.page = pageFromLine(host.wrapIndex, host.saved.line, host.saved.linesPerPage);
+  const rebuilt = !host.wrapIndex || host.wrapIndex.width !== inner;
+  if (rebuilt) host.wrapIndex = buildWrapIndex(host.raw, inner);
+  const n = host.saved.linesPerPage;
+  host.saved.page = rebuilt
+    ? pageFromLine(host.wrapIndex, host.saved.line, n)
+    : clampPage(host.wrapIndex, host.saved.line, host.saved.page, n);
 }
 
 export class ThoughtBlock implements Component {

@@ -186,6 +186,17 @@ export function lastPage(index: WrapIndex, linesPerPage: number): number {
   return Math.floor((total - 1) / n);
 }
 
+/** Keep page if it still sits inside this source line's wrapped span. */
+export function clampPage(index: WrapIndex, line1: number, page: number, linesPerPage: number): number {
+  const n = Math.max(1, linesPerPage);
+  const first = pageFromLine(index, line1, n);
+  if (!index.rows.length) return first;
+  const i = Math.max(0, Math.min(index.rows.length - 1, Math.floor(line1) - 1));
+  const end = index.starts[i + 1] ?? 0;
+  const last = end > 0 ? Math.floor((end - 1) / n) : first;
+  return page >= first && page <= last ? page : first;
+}
+
 export function lineFromPage(index: WrapIndex, page: number, linesPerPage: number): number {
   const n = Math.max(1, linesPerPage);
   if (!index.rows.length) return 1;
